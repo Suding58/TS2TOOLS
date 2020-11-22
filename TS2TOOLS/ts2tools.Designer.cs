@@ -45,17 +45,22 @@
             this.ContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.uNPACKToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.rEPACKToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.BlissBtn = new System.Windows.Forms.Button();
+            this.GoodsBtn = new System.Windows.Forms.Button();
+            this.button1 = new System.Windows.Forms.Button();
+            this.NpcmemBtn = new System.Windows.Forms.Button();
             this.ContextMenu.SuspendLayout();
             this.SuspendLayout();
             // 
             // JmgBtn
             // 
+            this.JmgBtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
             this.JmgBtn.Location = new System.Drawing.Point(10, 150);
             this.JmgBtn.Name = "JmgBtn";
             this.JmgBtn.Size = new System.Drawing.Size(88, 51);
             this.JmgBtn.TabIndex = 1;
             this.JmgBtn.Text = "JMG";
-            this.JmgBtn.UseVisualStyleBackColor = true;
+            this.JmgBtn.UseVisualStyleBackColor = false;
             this.JmgBtn.Click += new System.EventHandler(this.JmgBtn_Click);
             // 
             // BzpBtn
@@ -101,13 +106,13 @@
             // 
             // TalkBtn
             // 
-            this.TalkBtn.Enabled = false;
+            this.TalkBtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
             this.TalkBtn.Location = new System.Drawing.Point(210, 10);
             this.TalkBtn.Name = "TalkBtn";
             this.TalkBtn.Size = new System.Drawing.Size(88, 51);
             this.TalkBtn.TabIndex = 6;
             this.TalkBtn.Text = "TALKS";
-            this.TalkBtn.UseVisualStyleBackColor = true;
+            this.TalkBtn.UseVisualStyleBackColor = false;
             this.TalkBtn.Click += new System.EventHandler(this.TalkBtn_Click);
             // 
             // EveBtn
@@ -143,6 +148,7 @@
             this.listView1.TabIndex = 9;
             this.listView1.UseCompatibleStateImageBehavior = false;
             this.listView1.View = System.Windows.Forms.View.Details;
+            this.listView1.SelectedIndexChanged += new System.EventHandler(this.listView1_SelectedIndexChanged);
             // 
             // columnHeader1
             // 
@@ -184,11 +190,57 @@
             this.rEPACKToolStripMenuItem.Text = "REPACK";
             this.rEPACKToolStripMenuItem.Click += new System.EventHandler(this.rEPACKToolStripMenuItem_Click);
             // 
+            // BlissBtn
+            // 
+            this.BlissBtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            this.BlissBtn.ForeColor = System.Drawing.Color.Black;
+            this.BlissBtn.Location = new System.Drawing.Point(10, 207);
+            this.BlissBtn.Name = "BlissBtn";
+            this.BlissBtn.Size = new System.Drawing.Size(88, 51);
+            this.BlissBtn.TabIndex = 11;
+            this.BlissBtn.Text = "BLISS";
+            this.BlissBtn.UseVisualStyleBackColor = false;
+            this.BlissBtn.Click += new System.EventHandler(this.BlissBtn_Click);
+            // 
+            // GoodsBtn
+            // 
+            this.GoodsBtn.Location = new System.Drawing.Point(110, 207);
+            this.GoodsBtn.Name = "GoodsBtn";
+            this.GoodsBtn.Size = new System.Drawing.Size(88, 51);
+            this.GoodsBtn.TabIndex = 12;
+            this.GoodsBtn.Text = "GOODS";
+            this.GoodsBtn.UseVisualStyleBackColor = true;
+            this.GoodsBtn.Click += new System.EventHandler(this.GoodsBtn_Click);
+            // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(537, 244);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(88, 51);
+            this.button1.TabIndex = 13;
+            this.button1.Text = "uncom";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
+            // 
+            // NpcmemBtn
+            // 
+            this.NpcmemBtn.Location = new System.Drawing.Point(210, 207);
+            this.NpcmemBtn.Name = "NpcmemBtn";
+            this.NpcmemBtn.Size = new System.Drawing.Size(88, 51);
+            this.NpcmemBtn.TabIndex = 14;
+            this.NpcmemBtn.Text = "NPC MEM";
+            this.NpcmemBtn.UseVisualStyleBackColor = true;
+            this.NpcmemBtn.Click += new System.EventHandler(this.NpcmemBtn_Click);
+            // 
             // ts2tools
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(637, 217);
+            this.ClientSize = new System.Drawing.Size(637, 317);
+            this.Controls.Add(this.NpcmemBtn);
+            this.Controls.Add(this.button1);
+            this.Controls.Add(this.GoodsBtn);
+            this.Controls.Add(this.BlissBtn);
             this.Controls.Add(this.ItemTwBtn);
             this.Controls.Add(this.listView1);
             this.Controls.Add(this.SkillBtn);
@@ -226,6 +278,10 @@
         private System.Windows.Forms.ContextMenuStrip ContextMenu;
         private System.Windows.Forms.ToolStripMenuItem uNPACKToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem rEPACKToolStripMenuItem;
+        private System.Windows.Forms.Button BlissBtn;
+        private System.Windows.Forms.Button GoodsBtn;
+        private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Button NpcmemBtn;
     }
 }
 

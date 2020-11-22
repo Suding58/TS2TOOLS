@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Ionic.Zlib;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -39,6 +40,19 @@ namespace TS2TOOLS
             MessageBox.Show(msg, "ERROR!!", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
+
+        public byte[] MarkPacket(byte[] byte_0,byte xor)
+        {
+            byte[] array = new byte[byte_0.Length - 1 + 1];
+            int arg_14_0 = 0;
+            int num = byte_0.Length - 1;
+            for (int i = arg_14_0; i <= num; i++)
+            {
+                array[i] = (byte)(byte_0[i] ^ xor);
+            }
+            return array;
+        }
+
 
         private string ByteToStringX2(byte[] byte_0)
         {
@@ -100,7 +114,7 @@ namespace TS2TOOLS
                     v = ByteToStringX2(new byte[] { byte_0[0] });
                     break;
                 case 2:
-                    v = ByteToStringX2(new byte[] { byte_0[0], byte_0[1]});
+                    v = ByteToStringX2(new byte[] { byte_0[1], byte_0[0]});
                     break;
                 case 4:
                     v = ByteToStringX2(new byte[] { byte_0[3], byte_0[2], byte_0[1], byte_0[0] });
@@ -110,6 +124,11 @@ namespace TS2TOOLS
                     break;
             }
             return Convert.ToInt64(v,16);
+        }
+
+        public string IntTo1BS(int int_2)
+        {
+            return int_2.ToString("X2");
         }
 
         public string IntTo2BS(int int_2)
@@ -148,6 +167,13 @@ namespace TS2TOOLS
             return ret;
         }
 
+        private byte[] generateKey(int size)
+        {
+            byte[] buffer = new byte[size];
+            new Random().NextBytes(buffer);
+            return buffer;
+        }
+
         public byte[] Decode(byte[] data, byte xor)
         {
             byte[] newdata = new byte[data.Length];
@@ -156,6 +182,60 @@ namespace TS2TOOLS
                 newdata[i] = data[i] ^= xor;
             }
             return newdata;
+        }
+
+        private void decryptData(byte[] data, int rounds, bool reverseOrder, bool scan = false)
+        {
+            if (data == null)
+                return;
+            for (int index1 = 0; index1 < rounds; ++index1)
+            {
+                int index2 = reverseOrder ? 0 : data.Length - 1;
+                data[index2] = (byte)((int)data[data.Length - 1] ^ (int)byte.MaxValue ^ ((int)data[0] ^ (int)byte.MaxValue) ^ (int)byte.MaxValue);
+                if (reverseOrder)
+                {
+                    for (int index3 = data.Length - 2; index3 > -1; --index3)
+                        data[index3 + 1] = (byte)((uint)data[index3 + 1] ^ (uint)data[index3]);
+                }
+                else
+                {
+                    for (int index3 = 1; index3 < data.Length; ++index3)
+                        data[index3 - 1] = (byte)((uint)data[index3 - 1] ^ (uint)data[index3]);
+                }
+                for (int index3 = 0; index3 < data.Length; ++index3)
+                    data[index3] = (byte)((uint)data[index3] ^ (uint)byte.MaxValue);
+                if (scan && data[0] == (byte)120 && data[1] == (byte)156)
+                {
+                    int num = (int)MessageBox.Show(string.Format("{0}", (object)index1));
+                    return;
+                }
+            }
+            if (!scan)
+                return;
+            int num1 = (int)MessageBox.Show("Round not found");
+        }
+
+        private void encryptData(byte[] data, int rounds, bool reverseOrder)
+        {
+            if (data == null)
+                return;
+            for (int index1 = 0; index1 < rounds; ++index1)
+            {
+                int index2 = reverseOrder ? 0 : data.Length - 1;
+                for (int index3 = 0; index3 < data.Length; ++index3)
+                    data[index3] = (byte)((uint)data[index3] ^ (uint)byte.MaxValue);
+                if (reverseOrder)
+                {
+                    for (int index3 = 0; index3 < data.Length - 1; ++index3)
+                        data[index3 + 1] = (byte)((uint)data[index3 + 1] ^ (uint)data[index3]);
+                }
+                else
+                {
+                    for (int index3 = data.Length - 1; index3 > 0; --index3)
+                        data[index3 - 1] = (byte)((uint)data[index3 - 1] ^ (uint)data[index3]);
+                }
+                data[index2] = (byte)((int)data[data.Length - 1] ^ (int)byte.MaxValue ^ ((int)data[0] ^ (int)byte.MaxValue) ^ (int)byte.MaxValue);
+            }
         }
 
 
@@ -210,7 +290,7 @@ namespace TS2TOOLS
                             {
                                 Directory.CreateDirectory(nfile);
                             }
-                            File.WriteAllBytes(nfile + "/" + namefile, data);
+                            File.WriteAllBytes(nfile + "/" + namefile, Ionic.Zlib.ZlibStream.UncompressBuffer(data));
                         }
                     }
                 }
@@ -235,27 +315,38 @@ namespace TS2TOOLS
                     string nfile = file.Split('.').GetValue(0).ToString();
                     using (BinaryReader b = new BinaryReader(File.Open(file, FileMode.Open)))
                     {
-                        int start = 6;
+                        int start = 14;
                         while (true)
                         {
                             b.BaseStream.Seek(start, SeekOrigin.Begin);
-                            int offset = ByteArrayToInt4(b.ReadBytes(4));
-                            b.BaseStream.Seek(start + 4, SeekOrigin.Begin);
-                            int end = ByteArrayToInt4(b.ReadBytes(4));
-                            b.BaseStream.Seek(start + 8, SeekOrigin.Begin);
                             int nle = b.ReadByte();
                             byte[] name = b.ReadBytes(nle);
-                            b.BaseStream.Seek(offset, SeekOrigin.Begin);
-                            byte[] data = b.ReadBytes(end);
+                            b.BaseStream.Seek(start+20, SeekOrigin.Begin);
+                            int length = ByteArrayToInt4(b.ReadBytes(4));
+                            b.BaseStream.Seek(start + 24, SeekOrigin.Begin);
+                            int offsetStart = ByteArrayToInt4(b.ReadBytes(4));
+                            b.BaseStream.Seek(offsetStart, SeekOrigin.Begin);
+                            byte[] data = b.ReadBytes(length);
+
+
+                            //b.BaseStream.Seek(start, SeekOrigin.Begin);
+                            //int offset = ByteArrayToInt4(b.ReadBytes(4));
+                            //b.BaseStream.Seek(start + 4, SeekOrigin.Begin);
+                            //int end = ByteArrayToInt4(b.ReadBytes(4));
+                            //b.BaseStream.Seek(start + 8, SeekOrigin.Begin);
+                            //int nle = b.ReadByte();
+                            //byte[] name = b.ReadBytes(nle);
+                            //b.BaseStream.Seek(offset, SeekOrigin.Begin);
                             string namefile = Encoding.GetEncoding("big5").GetString(name);
                             start += 28;
+                            MessageBox.Show(start.ToString());
                             if (start >= b.BaseStream.Length || name.Length == 0)
                                 break;
                             if (!Directory.Exists(nfile))
                             {
                                 Directory.CreateDirectory(nfile);
                             }
-                            File.WriteAllBytes(nfile + "/" + namefile, data);
+                            File.WriteAllBytes(nfile + "/" + namefile, Ionic.Zlib.ZlibStream.UncompressBuffer(data));
                         }
                     }
                 }
@@ -379,7 +470,7 @@ namespace TS2TOOLS
                                     {
                                         if (a == 0)
                                             start++;
-                                        list.Add(Encoding.GetEncoding("TIS-620").GetString(b.ReadBytes(Length)));
+                                        list.Add(Encoding.GetEncoding("TIS-620").GetString(b.ReadBytes(Length)).Replace("\n", "").Replace("\r", ""));
                                     }
                                 }
                                 foreach (var x in list)
@@ -564,12 +655,139 @@ namespace TS2TOOLS
         {
             try
             {
-                openfile.Filter = "DAT |*.Dat";
+                openfile.Filter = "DAT|*.Dat|CSV|*.Csv";
                 DialogResult dr = this.openfile.ShowDialog();
                 foreach (String file in openfile.FileNames)
                 {
-                    if (!file.Contains("Item_TH"))
+                    if (!file.ToLower().Contains("talk"))
+                    {
                         Error(1);
+                        return;
+                    }
+
+                    string extension = Path.GetExtension(file);
+
+                    if (extension.ToLower() == ".dat")
+                    {
+                        StringBuilder listTalk = new StringBuilder();
+                        listTalk.AppendLine("unk,npc_id,speech");
+                        byte[] numArray1 = File.ReadAllBytes(file);
+                        byte[] data = (byte[])null;
+
+                        this.decryptData(numArray1, 12, false);
+                        this.decryptData(data, 12, false);
+                        try
+                        {
+                            numArray1 = ZlibStream.UncompressBuffer(numArray1);
+                        }
+                        catch
+                        {
+                            int num = (int)MessageBox.Show("Decryption Failed");
+                            return;
+                        }
+                        for (int index1 = 0; index1 < numArray1.Length; index1 += 258)
+                        {
+                            numArray1[index1] = (byte)((uint)numArray1[index1] ^ 155U);
+                            numArray1[index1 + 1] = (byte)((uint)numArray1[index1 + 1] ^ 241U);
+                            numArray1[index1 + 2] = (byte)((uint)numArray1[index1 + 2] ^ 186U);
+                            byte[] numArray2 = new byte[(int)numArray1[index1 + 3]];
+                            Array.Copy((Array)numArray1, index1 + 4, (Array)numArray2, 0, numArray2.Length);
+                            Array.Reverse((Array)numArray2);
+                            bool flag = numArray2.Length % 2 == 0;
+                            for (int index2 = 0; index2 < numArray2.Length - 3; index2 += 2)
+                            {
+                                byte num = numArray2[index2 + 1];
+                                if (flag)
+                                {
+                                    numArray2[index2 + 1] = numArray2[index2 + 2];
+                                    numArray2[index2 + 2] = num;
+                                }
+                                else
+                                {
+                                    numArray2[index2 + 1] = numArray2[index2 + 3];
+                                    numArray2[index2 + 3] = num;
+                                }
+                            }
+                            Array.Copy((Array)numArray2, 0, (Array)numArray1, index1 + 4, numArray2.Length);
+                            listTalk.AppendLine(ByteArrayToLong(new byte[] { numArray1[index1] }) + "," + ByteArrayToLong(new byte[] { numArray1[index1 + 1], numArray1[index1 + 2] }) + "," + Encoding.GetEncoding("TIS-620").GetString(numArray2).Replace("\n", ""));
+                        }
+                        File.WriteAllText("Talk_dec.csv", listTalk.ToString(), Encoding.UTF8);
+                        int num4 = (int)MessageBox.Show("Done");
+                    }
+                    else if (extension.ToLower() == ".csv")
+                    {
+                        using (StreamReader sr = new StreamReader(File.Open(file, FileMode.Open)))
+                        {
+                            byte[] byteTalk = new byte[0];
+                            int ntalk = 0;
+                            sr.ReadLine();
+                            while (sr.Peek() != -1 && !sr.EndOfStream)
+                            {
+                                byte[] listTask = new byte[0];
+                                string line = sr.ReadLine();
+                                List<string> lineValues = line.Split(',').ToList();
+                                try
+                                {
+                                    byte[] speech = Encoding.GetEncoding("TIS-620").GetBytes(lineValues[2]);
+                                    listTask = CombineArray(listTask, new byte[] { Convert.ToByte(lineValues[0]) });
+                                    listTask = CombineArray(listTask, BitConverter.GetBytes(Convert.ToUInt16(lineValues[1])));
+                                    listTask = CombineArray(listTask, new byte[] { Convert.ToByte(speech.Length)});
+                                    listTask = CombineArray(listTask, speech);
+                                    while (listTask.Length < 258)
+                                    {
+                                        listTask = CombineArray(listTask, new byte[] { 0x00 });
+                                    }
+                                    byteTalk = CombineArray(byteTalk, listTask);
+                                    ntalk++;
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show(ex.Message.ToString()+" | "+lineValues.Count.ToString());
+                                    return;
+                                }
+                            }
+
+                            if (byteTalk.Length == 0)
+                            {
+                                MessageBox.Show("Error");
+                                return;
+                            }
+
+                            for (int index1 = 0; index1 < byteTalk.Length; index1 += 258)
+                            {
+                                byteTalk[index1] = (byte)((uint)byteTalk[index1] ^ 155U);
+                                byteTalk[index1 + 1] = (byte)((uint)byteTalk[index1 + 1] ^ 241U);
+                                byteTalk[index1 + 2] = (byte)((uint)byteTalk[index1 + 2] ^ 186U);
+                                byte[] numArray2 = new byte[(int)byteTalk[index1 + 3]];
+                                Array.Copy((Array)byteTalk, index1 + 4, (Array)numArray2, 0, numArray2.Length);
+                                if (numArray2.Length % 2 == 0)
+                                {
+                                    for (int index2 = numArray2.Length - 4; index2 >= 0; index2 -= 2)
+                                    {
+                                        byte num = numArray2[index2 + 1];
+                                        numArray2[index2 + 1] = numArray2[index2 + 2];
+                                        numArray2[index2 + 2] = num;
+                                    }
+                                }
+                                else
+                                {
+                                    for (int index2 = numArray2.Length - 5; index2 >= 0; index2 -= 2)
+                                    {
+                                        byte num = numArray2[index2 + 1];
+                                        numArray2[index2 + 1] = numArray2[index2 + 3];
+                                        numArray2[index2 + 3] = num;
+                                    }
+                                }
+                                Array.Reverse((Array)numArray2);
+                                Array.Copy((Array)numArray2, 0, (Array)byteTalk, index1 + 4, numArray2.Length);
+                            }
+
+                            byteTalk = ZlibStream.CompressBuffer(byteTalk);
+                            this.encryptData(byteTalk, 12, false);
+                            File.WriteAllBytes("Talk_TH.Dat", byteTalk);
+                            MessageBox.Show("Done!");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -635,6 +853,10 @@ namespace TS2TOOLS
                     listView1.Items.Add(msg);
                     listView1.EnsureVisible(listView1.Items.Count - 1);
                 });
+            }
+            else
+            {
+                listView1.Items.Add(msg);
             }
         }
 
@@ -860,7 +1082,7 @@ namespace TS2TOOLS
             {
                 openfile.Filter = "DAT |*.Dat";
                 DialogResult dr = this.openfile.ShowDialog();
-                ArrayList array = new ArrayList()
+                ArrayList array = new ArrayList()//offset - Length
                 {
                     1,20,//Name
                     21,1,//Func1
@@ -899,19 +1121,17 @@ namespace TS2TOOLS
                     108,1,//??
                     109,1,//Trade
                     110,4,//??
-                    114,4,//??
+                    111,4,//??
                     118,4,//??
                     122,1,//MaxQty
                     123,2,//Maxdura
-                    125,1,//??
-                    126,1,//Upgrade
+                    125,2,//??
                     127,2,//ItemKey
-                    128,2,//unk
-                    130,2,//unk
-                    131,2,//Grade,mapid
+                    129,2,//unk
+                    131,2,//Grade,Mapid
                     133,2,//unk
                     135,2,//Job,X
-                    137,2,//aura,Y
+                    137,2,//Aura,Y
                     139,2,//Set
                     141,2,//St5f
                     143,2,//St8f
@@ -927,6 +1147,7 @@ namespace TS2TOOLS
                     167,254//Des
                 };
 
+
                 await Task.Run(() =>
                 {
                     int start = 0;
@@ -939,8 +1160,13 @@ namespace TS2TOOLS
                         {
                             StringBuilder data = new StringBuilder();
                             ArrayList list = new ArrayList();
-                            data.Append("name|func1|func2|itemid|icon_m|icon_f|model_m|model_f|st1|st2|st3|op_st1|op_st2|op_st3|unk1|unk2|position|unk3|color1|color2|color3|color4|color5|color6|color7|color8|color9|color10|" +
-                                        "unk4|lvuse|buy|sell|gender|unk5|unk6|trade|unk7|unk8|unk9|maxqty|maxdura|unk10|unk11|ItemKey|unk12|unk13|grade,mapid|unk15|job,x|aura,y|set|st5f|st8f|st10f|qty5f|qty8f|qty10f|skill_id|unk18|skill_lv|npcid|unk19|des");
+
+                            data.Append("name,func1,func2,item_id,icon_m,icon_f,model_m,model_f,st1,st2,st3,op_st1,op_st2,op_st3,unk1,unk2,eq_pos,unk3,color1,color2,color3,color4,color5,color6,color7,color8,color9,color10," +
+                                       "unk4,use_lv,buy,sell,use_gender,unk5,unk6,trade_st,unk7,unk8,unk9,max_qty,max_dura,unk10,item_key,unk12,item_grade|map_id,unk13,use_job|map_x,spirit_el|map_y,item_set,st5f,st8f,st10f,qty5f,qty8f,qty10f,skill_id,unk17,skill_lv,npc_id,unk18,des");
+
+
+                            //data.Append("name,func1,func2,itemid,icon_m,icon_f,model_m,model_f,st1,st2,st3,op_st1,op_st2,op_st3,unk1,unk2,position,unk3,color1,color2,color3,color4,color5,color6,color7,color8,color9,color10," +
+                            //            "unk4,lvuse,buy,sell,gender,unk5,unk6,trade,unk7,unk8,unk9,maxqty,maxdura,unk10,unk11,ItemKey,unk12,unk13,grade,mapid,unk15,job,x,aura,y,set,st5f,st8f,st10f,qty5f,qty8f,qty10f,skill_id,unk18,skill_lv,npcid,unk19,des");
                             for (int i = 0; i < b.BaseStream.Length; i += 421)
                             {
                                 data.AppendLine();
@@ -968,12 +1194,12 @@ namespace TS2TOOLS
                                     {
                                         if (a == 0)
                                             start++;
-                                        list.Add(Encoding.GetEncoding("big5").GetString(b.ReadBytes(Length)));
+                                        list.Add(Encoding.GetEncoding("big5").GetString(b.ReadBytes(Length)).Replace("\n", "").Replace("\r", ""));
                                     }
                                 }
                                 foreach (var x in list)
                                 {
-                                    data.Append(x + "|");
+                                    data.Append(x + ",");
                                 }
                                 list.Clear();
                             }
@@ -1149,6 +1375,365 @@ namespace TS2TOOLS
             catch (Exception ex)
             {
                 MessageBox.Show(ex.ToString());
+            }
+
+        }
+
+        private void BlissBtn_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                openfile.Filter = "DAT|*.Dat|CSV|*.Csv";
+                DialogResult dr = this.openfile.ShowDialog();
+                ArrayList array = new ArrayList()//, field Length
+                {
+                    2, 1,1,2,2,2,1,
+                };
+
+                foreach (String file in openfile.FileNames)
+                {
+                    if (!file.ToLower().Contains("blissbag"))
+                    {
+                        Error(1);
+                        return;
+                    }
+
+                    string extension = Path.GetExtension(file);
+
+                    if(extension.ToLower() == ".dat")
+                    {
+                        byte[] rawData = File.ReadAllBytes(file);
+                        if (rawData[0] != 0x78)
+                        {
+                            MessageBox.Show("Couldn't find round");
+                            return;
+                        }
+                        byte[] data = Ionic.Zlib.ZlibStream.UncompressBuffer(rawData);
+                        StringBuilder csvbliss = new StringBuilder();
+                        csvbliss.Append("bliss_id,in,get,??,??,??,??,");
+                        int x = 1;
+                        do
+                        {
+                            csvbliss.Append("item" + x + ",qty" + x + ",per" + x + ",tag" + x + ",");
+                            if (x == 30)
+                            {
+                                csvbliss.AppendLine();
+                                break;
+                            }
+                            x++;
+                        }
+                        while (true);
+                        for (int index = 0; index < data.Length; index += 221)
+                        {
+                            StringBuilder bliss = new StringBuilder();
+                            int i = index;
+                            int field = 0;
+                            for (int a = 0; a < array.Count; a++)
+                            {
+                                if (i >= data.Length - 1 || field >= 127)
+                                    break;
+                                int Length = Convert.ToInt32(array[a]);
+                                switch (Length)
+                                {
+                                    case 1:
+                                        bliss.Append(ByteArrayToLong(new byte[] { data[i] }));
+                                        break;
+                                    case 2:
+                                        bliss.Append(ByteArrayToLong(new byte[] { data[i], data[i + 1] }));
+                                        break;
+                                }
+                                bliss.Append(",");
+                                if (a == array.Count - 1)
+                                    a = 2;
+                                i += Length;
+                                field++;
+                            }
+                            csvbliss.AppendLine(bliss.ToString());
+                            bliss.Clear();
+                        }
+                        File.WriteAllText("blissbag_dec.csv", csvbliss.ToString(), Encoding.UTF8);
+                        MessageBox.Show("Done!");
+                    }
+                    else if (extension.ToLower() == ".csv")
+                    {
+                        using (StreamReader sr = new StreamReader(File.Open(file, FileMode.Open)))
+                        {
+                            byte[] blissByte = new byte[0];
+                            sr.ReadLine();
+                            while (sr.Peek() != -1)
+                            {
+                                string line = sr.ReadLine();
+                                List<string> lineValues = line.Split(',').ToList();
+                                int i = 0;
+                                int field = 0;
+                                for (int a = 0; a < array.Count; a++)
+                                {
+                                    if (i >= lineValues.Count || field >= 127)
+                                        break;
+                                    int Length = Convert.ToInt32(array[a]);
+                                    switch (Length)
+                                    {
+                                        case 1:
+                                            blissByte = CombineArray(blissByte, new byte[] { Convert.ToByte(lineValues[i]) });
+                                            break;
+                                        case 2:
+                                            blissByte = CombineArray(blissByte, BitConverter.GetBytes(Convert.ToUInt16(lineValues[i])));
+                                            break;
+                                    }
+                                    if (a == array.Count - 1)
+                                        a = 2;
+                                    i++;
+                                    field++;
+                                }
+                                //break;
+                            }
+                            blissByte = Ionic.Zlib.ZlibStream.CompressBuffer(blissByte);
+                            File.WriteAllBytes("blissbag_dec.Dat", blissByte);
+                            MessageBox.Show("Done!");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message.ToString()+ex.StackTrace.ToString());
+            }
+        }
+
+        private void listView1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void GoodsBtn_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                openfile.Filter = "DAT|*.Dat|CSV|*.Csv";
+                DialogResult dr = this.openfile.ShowDialog();
+                ArrayList array = new ArrayList()//, field Length
+                {
+                    2, 1,1,2,2,2,1,
+                };
+
+                foreach (String file in openfile.FileNames)
+                {
+                    if (!file.ToLower().Contains("goodssale"))
+                    {
+                        Error(1);
+                        return;
+                    }
+
+                    string extension = Path.GetExtension(file);
+
+                    if (extension.ToLower() == ".dat")
+                    {
+                        byte[] rawData = MarkPacket(File.ReadAllBytes(file), 0x81);
+
+                        if (rawData[0] != 0x78)
+                        {
+                            MessageBox.Show("Couldn't find round");
+                            return;
+                        }
+                        byte[] data = Ionic.Zlib.ZlibStream.UncompressBuffer(rawData);
+                        StringBuilder csvbliss = new StringBuilder();
+                        csvbliss.Append("bliss_id,in,get,??,??,??,??,");
+                        int x = 1;
+                        do
+                        {
+                            csvbliss.Append("item" + x + ",qty" + x + ",per" + x + ",tag" + x + ",");
+                            if (x == 30)
+                            {
+                                csvbliss.AppendLine();
+                                break;
+                            }
+                            x++;
+                        }
+                        while (true);
+                        for (int index = 0; index < data.Length; index += 221)
+                        {
+                            StringBuilder bliss = new StringBuilder();
+                            int i = index;
+                            int field = 0;
+                            for (int a = 0; a < array.Count; a++)
+                            {
+                                if (i >= data.Length - 1 || field >= 127)
+                                    break;
+                                int Length = Convert.ToInt32(array[a]);
+                                switch (Length)
+                                {
+                                    case 1:
+                                        bliss.Append(ByteArrayToLong(new byte[] { data[i] }));
+                                        break;
+                                    case 2:
+                                        bliss.Append(ByteArrayToLong(new byte[] { data[i], data[i + 1] }));
+                                        break;
+                                }
+                                bliss.Append(",");
+                                if (a == array.Count - 1)
+                                    a = 2;
+                                i += Length;
+                                field++;
+                            }
+                            csvbliss.AppendLine(bliss.ToString());
+                            bliss.Clear();
+                        }
+                        File.WriteAllText("bliss_dec.csv", csvbliss.ToString(), Encoding.UTF8);
+                        MessageBox.Show("Done!");
+                    }
+                    else if (extension.ToLower() == ".csv")
+                    {
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message.ToString() + ex.StackTrace.ToString());
+            }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            Logging("OK");
+            //MessageBox.Show("OK");
+            //try
+            //{
+            //    openfile.Filter = "DAT|*.Dat|CSV|*.Csv";
+            //    DialogResult dr = this.openfile.ShowDialog();
+            //    ArrayList array = new ArrayList()//, field Length
+            //    {
+            //        2, 1,1,2,2,2,1,
+            //    };
+
+            //    foreach (String file in openfile.FileNames)
+            //    {
+            //        byte[] rawData = File.ReadAllBytes(file);
+
+            //        if (rawData[0] != 0x78)
+            //        {
+            //            MessageBox.Show("Couldn't find round");
+            //            return;
+            //        }
+            //        byte[] data = Ionic.Zlib.ZlibStream.UncompressBuffer(rawData);
+            //        File.WriteAllBytes("sss_dec.Dat", data);
+            //    }
+            //}
+            //catch (Exception ex)
+            //{
+            //    MessageBox.Show(ex.Message.ToString() + ex.StackTrace.ToString());
+            //}
+        }
+
+        private void NpcmemBtn_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                openfile.Filter = "DAT|*.Dat|CSV|*.Csv";
+                DialogResult dr = this.openfile.ShowDialog();
+                foreach (String file in openfile.FileNames)
+                {
+                    if (!file.ToLower().Contains("npc_memoir"))
+                    {
+                        Error(1);
+                        return;
+                    }
+                    byte[] data = (byte[])null;
+                    int rounds = 0;
+                    string extension = Path.GetExtension(file);
+
+                    if (extension.ToLower() == ".dat")
+                    {
+                        StringBuilder listText = new StringBuilder();
+                        listText.AppendLine("npc_id,description");
+                        byte[] numArray1 = File.ReadAllBytes(file);
+                       
+
+                        int length = 406;
+                        data = new byte[length];
+                        byte[] numArray2 = new byte[numArray1.Length - length];
+                        Array.Copy((Array)numArray1, 0, (Array)numArray2, 0, numArray2.Length);
+                        Array.Copy((Array)numArray1, numArray2.Length, (Array)data, 0, length);
+                        numArray1 = numArray2;
+                        rounds = numArray1.Length / 203;
+
+
+                        int num1 = 1;
+                        int num2 = data.Length / 2;
+                        for (int index1 = 0; index1 < rounds; ++index1)
+                        {
+                            for (int index2 = 0; index2 < num2; ++index2)
+                                numArray1[index1 * num2 + index2] = (byte)((uint)numArray1[index1 * num2 + index2] ^ (uint)data[num1 * num2 + index2]);
+                            num1 = num1 == 1 ? 0 : 1;
+                        }
+
+                        for(int index2=0;index2<numArray1.Length;index2+=203)
+                        {
+                            long id = ByteArrayToLong(new byte[] { numArray1[index2], numArray1[index2 + 1] });
+                            byte[] text = new byte[numArray1[index2 + 2]];
+                            Array.Copy(numArray1, index2 + 3, text, 0, text.Length);
+                            listText.AppendLine(id + "," + Encoding.GetEncoding("TIS-620").GetString(text).Replace("\n", ""));
+                            Array.Clear(text,0, text.Length);
+                        }
+                        File.WriteAllText(Path.GetFileNameWithoutExtension(file) + "_dec.csv", listText.ToString(), Encoding.UTF8);
+                        MessageBox.Show("Done");
+                    }
+                    else if (extension.ToLower() == ".csv")
+                    {
+                        using (StreamReader sr = new StreamReader(File.Open(file, FileMode.Open)))
+                        {
+                            byte[] byteText = new byte[0];
+                            sr.ReadLine();
+                            while (sr.Peek() != -1 && !sr.EndOfStream)
+                            {
+                                byte[] listText = new byte[0];
+                                string line = sr.ReadLine();
+                                List<string> lineValues = line.Split(',').ToList();
+                                try
+                                {
+                                    byte[] text = Encoding.GetEncoding("TIS-620").GetBytes(lineValues[1]);
+                                    listText = CombineArray(listText, BitConverter.GetBytes(Convert.ToUInt16(lineValues[0])));
+                                    listText = CombineArray(listText, new byte[] { Convert.ToByte(text.Length)});
+                                    listText = CombineArray(listText, text);
+                                    while (listText.Length < 203)
+                                    {
+                                        listText = CombineArray(listText, new byte[] { 0x00 });
+                                    }
+                                    byteText = CombineArray(byteText, listText);
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show(ex.Message.ToString() + " | " + lineValues.Count.ToString());
+                                    return;
+                                }
+                            }
+
+                            if (byteText.Length == 0)
+                            {
+                                MessageBox.Show("Error");
+                                return;
+                            }
+
+                            byte[] numArray2;
+                            data = this.generateKey(406);
+                            rounds = byteText.Length / 203;
+
+                            int num1 = data.Length / 2;
+                            for (int index1 = 0; index1 < rounds; ++index1)
+                            {
+                                int num2 = index1 % 2 == 0 ? 1 : 0;
+                                for (int index2 = 0; index2 < num1; ++index2)
+                                    byteText[index1 * num1 + index2] = (byte)((uint)byteText[index1 * num1 + index2] ^ (uint)data[num2 * num1 + index2]);
+                            }
+                            numArray2 = ((IEnumerable<byte>)byteText).Concat<byte>((IEnumerable<byte>)data).ToArray<byte>();
+                            File.WriteAllBytes("Npc_Memoir_TH.Dat", numArray2);
+                            MessageBox.Show("Done!");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message.ToString());
             }
 
         }
